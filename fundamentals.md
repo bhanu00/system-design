@@ -2,6 +2,7 @@
 ## What is System Design
 ## [SPOF](https://en.wikipedia.org/wiki/Single_point_of_failure)
 ## [Latency - Why it matters?](https://www.ibm.com/topics/latency)
+A simplified, but helpful way to remember the relationship between latency, bandwidth and throughput is that bandwidth is the amount of data that could travel over a network, throughput is the measure of how much actually transfers per second, and latency is the time it takes to do so.
 ## [CAP Theorem](https://www.ibm.com/topics/cap-theorem)
 This document explains about Consistency ([Strong vs Week](https://www.geeksforgeeks.org/eventual-vs-strong-consistency-in-distributed-databases/)), Availability, Partition tolerance and detailed about CAP theorem.
 
