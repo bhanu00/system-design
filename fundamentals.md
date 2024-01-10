@@ -13,3 +13,5 @@ This document explains about Consistency ([Strong vs Week](https://www.geeksforg
 ## [SQL vs NoSQL](https://www.ibm.com/blog/sql-vs-nosql/)
 ## [Caching](https://medium.com/must-know-computer-science/system-design-caching-acbd1b02ca01) and [Common Caching missunderstandings](https://medium.com/geekculture/system-design-basics-5-common-caching-misunderstandings-explained-2f19b1c88373)
 Caching, cache Hit, Cache Miss, Cache Invalidation Strategy
+
+## Disaster Recovery Solutions
