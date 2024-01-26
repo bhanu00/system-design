@@ -20,7 +20,11 @@ This document explains about Consistency ([Strong vs Week](https://www.geeksforg
 
 
 ## [SQL vs NoSQL](https://www.ibm.com/blog/sql-vs-nosql/)
-## [Caching](https://medium.com/must-know-computer-science/system-design-caching-acbd1b02ca01) and [Common Caching missunderstandings](https://medium.com/geekculture/system-design-basics-5-common-caching-misunderstandings-explained-2f19b1c88373)
-Caching, cache Hit, Cache Miss, Cache Invalidation Strategy
+## Caching
+Know more about Caching, Cache Hit, Cache Miss, Cache Invalidation Strategy
+- [Caching](https://medium.com/must-know-computer-science/system-design-caching-acbd1b02ca01)
+- [Common Caching missunderstandings](https://medium.com/geekculture/system-design-basics-5-common-caching-misunderstandings-explained-2f19b1c88373)
 
 ## Disaster Recovery Solutions
+- [Disaster Recovery (DR) Architecture on AWS](https://aws.amazon.com/blogs/architecture/disaster-recovery-dr-architecture-on-aws-part-i-strategies-for-recovery-in-the-cloud/)
+- Dive deep into [Disaster Recovery of Workloads on AWS: Recovery in the Cloud](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/introduction.html)
