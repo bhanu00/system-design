@@ -23,6 +23,15 @@ A simplified, but helpful way to remember the relationship between latency, band
 ## [CAP Theorem](https://www.ibm.com/topics/cap-theorem)
 This document explains about Consistency ([Strong vs Week](https://www.geeksforgeeks.org/eventual-vs-strong-consistency-in-distributed-databases/)), Availability, Partition tolerance and detailed about CAP theorem.
 
+## Load Balancing and algorithms
+- Algorithms used in Load balancing
+    - Layman's Approach
+    - Least Connections
+    - Least Response Time
+    - Round Robin
+    - Weighted Round Robin
+    - IP Hash
+    - Consistent Hashing
 
 ## [SQL vs NoSQL](https://www.ibm.com/blog/sql-vs-nosql/)
 ## Caching
