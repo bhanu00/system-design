@@ -5,7 +5,8 @@
 ## What is System Design
 ## Characteristics of System Design or Non-Functional Requirements
 - [SPOF](https://en.wikipedia.org/wiki/Single_point_of_failure)
-- Scalability
+- [Scalability](https://systemdesignprep.com/scalability)
+    - [Architecting for Reliable Scalability](https://aws.amazon.com/blogs/architecture/architecting-for-reliable-scalability/) 
 - [Reliability](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/reliability.html)
 - High Availability
     - [Understanding availability](https://docs.aws.amazon.com/whitepapers/latest/availability-and-beyond-improving-resilience/understanding-availability.html) 
