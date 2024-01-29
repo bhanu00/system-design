@@ -1,16 +1,19 @@
 # Fundamentals of System Design
+## Cloud Native
+- [Cloud native - Microsoft](https://learn.microsoft.com/en-us/dotnet/architecture/cloud-native/definition)
+- [Cloud native - AWS](https://aws.amazon.com/what-is/cloud-native/)
 ## What is System Design
 ## Characteristics of System Design or Non-Functional Requirements
-- Scalable
-- Performance
-- Maintenance
-- Reliable
+- [SPOF](https://en.wikipedia.org/wiki/Single_point_of_failure)
+- Scalability
+- [Reliability](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/reliability.html)
 - High Availability
-- Resilient
+    - [Understanding availability](https://docs.aws.amazon.com/whitepapers/latest/availability-and-beyond-improving-resilience/understanding-availability.html) 
+- Resiliency
     - [How to verify resiliancy of a cloud-native application](https://www.ibm.com/blog/a-four-step-approach-to-verifying-the-resiliency-of-cloud-native-applications/)
 - Fault Tolerance
-
-## [SPOF](https://en.wikipedia.org/wiki/Single_point_of_failure)
+- Performance
+- Maintenance
 ## [Latency - Why it matters?](https://www.ibm.com/topics/latency)
 A simplified, but helpful way to remember the relationship between latency, bandwidth and throughput is that bandwidth is the amount of data that could travel over a network, throughput is the measure of how much actually transfers per second, and latency is the time it takes to do so.
 - ### CDN
