@@ -7,6 +7,7 @@
 - Reliable
 - High Availability
 - Resilient
+    - [How to verify resiliancy of a cloud-native application](https://www.ibm.com/blog/a-four-step-approach-to-verifying-the-resiliency-of-cloud-native-applications/)
 - Fault Tolerance
 
 ## [SPOF](https://en.wikipedia.org/wiki/Single_point_of_failure)
@@ -24,6 +25,7 @@ This document explains about Consistency ([Strong vs Week](https://www.geeksforg
 Know more about Caching, Cache Hit, Cache Miss, Cache Invalidation Strategy
 - [Caching](https://medium.com/must-know-computer-science/system-design-caching-acbd1b02ca01)
 - [Common Caching missunderstandings](https://medium.com/geekculture/system-design-basics-5-common-caching-misunderstandings-explained-2f19b1c88373)
+- [Different levels of caching](https://medium.com/@abhishekranjandev/caching-in-system-design-an-in-depth-exploration-b51e2c2e4dbd)
 
 ## Disaster Recovery Solutions
 - [Disaster Recovery (DR) Architecture on AWS](https://aws.amazon.com/blogs/architecture/disaster-recovery-dr-architecture-on-aws-part-i-strategies-for-recovery-in-the-cloud/)
