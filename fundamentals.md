@@ -15,6 +15,8 @@
 - Fault Tolerance
 - Performance
 - Maintenance
+- [Idempotency](https://serverlessland.com/event-driven-architecture/idempotency)
+    - [Implement idempotent AWS Lambda functions](https://aws.amazon.com/blogs/compute/implementing-idempotent-aws-lambda-functions-with-powertools-for-aws-lambda-typescript/)
 ## [Latency - Why it matters?](https://www.ibm.com/topics/latency)
 A simplified, but helpful way to remember the relationship between latency, bandwidth and throughput is that bandwidth is the amount of data that could travel over a network, throughput is the measure of how much actually transfers per second, and latency is the time it takes to do so.
 - ### CDN
