@@ -39,6 +39,7 @@ This document explains about Consistency ([Strong vs Week](https://www.geeksforg
   - [When to Use Webhooks, WebSocket, Pub/Sub, and Polling] (https://hookdeck.com/webhooks/guides/when-to-use-webhooks)
   - [Webhook vs. API](https://zapier.com/blog/webhook-vs-api/)
   - [Different Ways to create API]
+  - [API Proxy]
   - [Reverse proxy vs. API gateway vs. load balancer]
 
 ## [SQL vs NoSQL](https://www.ibm.com/blog/sql-vs-nosql/)
