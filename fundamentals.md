@@ -41,6 +41,7 @@ This document explains about Consistency ([Strong vs Week](https://www.geeksforg
   - [Different Ways to create API]
   - [API Proxy]
   - [Reverse proxy vs. API gateway vs. load balancer]
+  - [Open API Spec] (https://swagger.io/specification/)
 
 ## [SQL vs NoSQL](https://www.ibm.com/blog/sql-vs-nosql/)
 ## Caching
