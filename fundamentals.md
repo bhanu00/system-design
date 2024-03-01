@@ -54,6 +54,10 @@ Know more about Caching, Cache Hit, Cache Miss, Cache Invalidation Strategy
 - [Disaster Recovery (DR) Architecture on AWS](https://aws.amazon.com/blogs/architecture/disaster-recovery-dr-architecture-on-aws-part-i-strategies-for-recovery-in-the-cloud/)
 - Dive deep into [Disaster Recovery of Workloads on AWS: Recovery in the Cloud](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/introduction.html)
 
+## Authentication and Authorization
+- [Token Types](https://cloud.google.com/docs/authentication/token-types)
+- [JWT Tokens](https://jwt.io/introduction/)
+
 ## Software Diagrams
 - [Sequence Diagrams] - TODO , Lucide Chart we can use to create sequence diagrams [Sequence daigram with Lucid](https://www.youtube.com/watch?v=pCK6prSq8aw).
 - [UML Diagrams]
