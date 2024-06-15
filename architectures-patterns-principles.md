@@ -1,5 +1,7 @@
 ## [Design Principles]()
 - [SOLID]
+- [SoC]
+- [LoD]
 - [DRY]
 - [YAGNI]
 - [KISS]
