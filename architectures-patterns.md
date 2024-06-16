@@ -1,10 +1,3 @@
-## [Design Principles]()
-- [SOLID]
-- [SoC]
-- [LoD]
-- [DRY]
-- [YAGNI]
-- [KISS]
 Below are the resources for Architectural patterns
 ## [Architecture Patterns](https://learn.microsoft.com/en-us/azure/architecture/patterns/)
 ## Microservices Patterns
