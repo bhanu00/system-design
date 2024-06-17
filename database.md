@@ -11,3 +11,8 @@ Note: Still content belong to website holders and complete credit goes to them.
     - [Data Integrity Examples](https://www.ibm.com/blog/data-integrity-examples/)
 - ### [ACID]
 ## NoSQL
+- ### Data Idempotency
+- ### Consistency
+
+## In-Memory DB
+- ### 
