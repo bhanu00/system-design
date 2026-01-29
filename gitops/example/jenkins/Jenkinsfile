@@ -1,0 +1,353 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'ghcr.io'
+        IMAGE_NAME = 'company/products-api'
+        KUBECONFIG = credentials('kubeconfig')
+        GITHUB_TOKEN = credentials('github-token')
+        SONAR_TOKEN = credentials('sonar-token')
+    }
+    
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Target environment for deployment'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip running tests'
+        )
+        booleanParam(
+            name: 'FORCE_DEPLOY',
+            defaultValue: false,
+            description: 'Force deployment even if tests fail'
+        )
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    env.BUILD_TIMESTAMP = sh(
+                        script: 'date +%Y%m%d-%H%M%S',
+                        returnStdout: true
+                    ).trim()
+                    env.IMAGE_TAG = "${env.BUILD_TIMESTAMP}-${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build Application') {
+            steps {
+                dir('ProductsAPI') {
+                    sh '''
+                        echo "Building .NET application..."
+                        dotnet restore ProductsAPI.csproj
+                        dotnet build ProductsAPI.csproj --no-restore --configuration Release
+                    '''
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            when {
+                not { params.SKIP_TESTS }
+            }
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        dir('ProductsAPI') {
+                            sh '''
+                                echo "Running unit tests..."
+                                dotnet test ProductsAPI.csproj --no-build --configuration Release --verbosity normal --logger trx --results-directory TestResults
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults testResultsPattern: 'ProductsAPI/TestResults/*.trx'
+                        }
+                    }
+                }
+                
+                stage('Code Quality') {
+                    steps {
+                        dir('ProductsAPI') {
+                            sh '''
+                                echo "Running SonarQube analysis..."
+                                dotnet sonarscanner begin /k:"products-api" /d:sonar.host.url="http://sonarqube:9000" /d:sonar.login="${SONAR_TOKEN}"
+                                dotnet build ProductsAPI.csproj --configuration Release
+                                dotnet sonarscanner end /d:sonar.login="${SONAR_TOKEN}"
+                            '''
+                        }
+                    }
+                }
+                
+                stage('Security Scan') {
+                    steps {
+                        sh '''
+                            echo "Running security scan..."
+                            # Run OWASP dependency check
+                            dependency-check --project "Products API" --scan ./ProductsAPI --format XML --out ./security-reports
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'security-reports/**', allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dir('ProductsAPI') {
+                        def image = docker.build("${DOCKER_REGISTRY}/${IMAGE_NAME}:${env.IMAGE_TAG}")
+                        
+                        // Also tag as latest for the current branch
+                        if (env.BRANCH_NAME == 'main') {
+                            image.tag('latest')
+                        }
+                        
+                        // Security scan of the image
+                        sh """
+                            echo "Scanning Docker image for vulnerabilities..."
+                            trivy image --format json --output trivy-report.json ${DOCKER_REGISTRY}/${IMAGE_NAME}:${env.IMAGE_TAG}
+                        """
+                        
+                        archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
+                    }
+                }
+            }
+        }
+        
+        stage('Push Docker Image') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    expression { params.FORCE_DEPLOY }
+                }
+            }
+            steps {
+                script {
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", 'github-token') {
+                        def image = docker.image("${DOCKER_REGISTRY}/${IMAGE_NAME}:${env.IMAGE_TAG}")
+                        image.push()
+                        
+                        if (env.BRANCH_NAME == 'main') {
+                            image.push('latest')
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Update Helm Chart') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    expression { params.FORCE_DEPLOY }
+                }
+            }
+            steps {
+                script {
+                    sh """
+                        echo "Updating Helm chart with new image tag..."
+                        cd helm-charts/products-api
+                        
+                        # Update image tag in values file
+                        sed -i 's/tag: .*/tag: "${env.IMAGE_TAG}"/' values-${params.ENVIRONMENT}.yaml
+                        
+                        # Update Chart version
+                        CHART_VERSION=\$(date +%Y%m%d.%H%M%S)
+                        sed -i "s/version: .*/version: \${CHART_VERSION}/" Chart.yaml
+                        
+                        # Validate Helm chart
+                        helm lint .
+                        helm template products-api . --values values-${params.ENVIRONMENT}.yaml > /tmp/rendered-manifest.yaml
+                        
+                        # Commit changes to GitOps repository
+                        git config user.name "Jenkins CI"
+                        git config user.email "jenkins@company.com"
+                        git add .
+                        git commit -m "chore: update ${params.ENVIRONMENT} image to ${env.IMAGE_TAG} [skip ci]"
+                        git push origin main
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    expression { params.FORCE_DEPLOY }
+                }
+            }
+            steps {
+                script {
+                    sh """
+                        echo "Deploying to ${params.ENVIRONMENT} environment..."
+                        
+                        # Deploy using Helm
+                        helm upgrade --install products-api-${params.ENVIRONMENT} ./helm-charts/products-api \\
+                            --namespace products-api-${params.ENVIRONMENT} \\
+                            --create-namespace \\
+                            --values ./helm-charts/products-api/values-${params.ENVIRONMENT}.yaml \\
+                            --set image.tag=${env.IMAGE_TAG} \\
+                            --wait --timeout=300s
+                        
+                        # Verify deployment
+                        kubectl get pods -n products-api-${params.ENVIRONMENT} -l app=products-api
+                        kubectl get svc -n products-api-${params.ENVIRONMENT}
+                        
+                        # Run smoke tests
+                        echo "Running smoke tests..."
+                        kubectl run smoke-test-${BUILD_NUMBER} --image=curlimages/curl --rm -i --restart=Never -- \\
+                            curl -f http://products-api.products-api-${params.ENVIRONMENT}.svc.cluster.local/health
+                    """
+                }
+            }
+        }
+        
+        stage('Integration Tests') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { params.ENVIRONMENT == 'dev' }
+                }
+            }
+            steps {
+                script {
+                    sh """
+                        echo "Running integration tests against ${params.ENVIRONMENT}..."
+                        
+                        # Get service endpoint
+                        SERVICE_IP=\$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+                        
+                        # Run API tests
+                        curl -f -H "Host: products-api-${params.ENVIRONMENT}.local" http://\${SERVICE_IP}/health
+                        curl -f -H "Host: products-api-${params.ENVIRONMENT}.local" http://\${SERVICE_IP}/api/products
+                        
+                        # Create test product
+                        curl -X POST -H "Host: products-api-${params.ENVIRONMENT}.local" -H "Content-Type: application/json" \\
+                            -d '{"name":"Test Product","description":"Integration test product","price":99.99,"category":"Test"}' \\
+                            http://\${SERVICE_IP}/api/products
+                    """
+                }
+            }
+        }
+        
+        stage('Performance Tests') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    sh """
+                        echo "Running performance tests..."
+                        
+                        # Install k6 if not available
+                        if ! command -v k6 &> /dev/null; then
+                            echo "Installing k6..."
+                            sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+                            echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+                            sudo apt-get update
+                            sudo apt-get install k6
+                        fi
+                        
+                        # Run load tests
+                        k6 run --vus 10 --duration 30s performance-tests/load-test.js
+                    """
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'performance-results/**', allowEmptyArchive: true
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Clean up workspace
+            cleanWs()
+            
+            // Archive build artifacts
+            archiveArtifacts artifacts: 'ProductsAPI/TestResults/**', allowEmptyArchive: true
+        }
+        
+        success {
+            script {
+                if (env.BRANCH_NAME == 'main') {
+                    // Send success notification
+                    slackSend(
+                        channel: '#deployments',
+                        color: 'good',
+                        message: """
+                        ✅ *Products API Deployment Successful*
+                        
+                        *Environment:* ${params.ENVIRONMENT}
+                        *Image Tag:* ${env.IMAGE_TAG}
+                        *Build:* ${BUILD_NUMBER}
+                        *Commit:* ${env.GIT_COMMIT_SHORT}
+                        *Branch:* ${env.BRANCH_NAME}
+                        
+                        <${BUILD_URL}|View Build Details>
+                        """.stripIndent()
+                    )
+                }
+            }
+        }
+        
+        failure {
+            // Send failure notification
+            slackSend(
+                channel: '#deployments',
+                color: 'danger',
+                message: """
+                ❌ *Products API Deployment Failed*
+                
+                *Environment:* ${params.ENVIRONMENT}
+                *Build:* ${BUILD_NUMBER}
+                *Branch:* ${env.BRANCH_NAME}
+                *Stage:* ${env.STAGE_NAME}
+                
+                <${BUILD_URL}|View Build Details>
+                <${BUILD_URL}console|View Console Output>
+                """.stripIndent()
+            )
+        }
+        
+        unstable {
+            // Send unstable notification
+            slackSend(
+                channel: '#deployments',
+                color: 'warning',
+                message: """
+                ⚠️ *Products API Build Unstable*
+                
+                *Environment:* ${params.ENVIRONMENT}
+                *Build:* ${BUILD_NUMBER}
+                *Branch:* ${env.BRANCH_NAME}
+                
+                <${BUILD_URL}|View Build Details>
+                """.stripIndent()
+            )
+        }
+    }
+}

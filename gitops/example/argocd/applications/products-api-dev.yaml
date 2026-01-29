@@ -1,0 +1,89 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: products-api-dev
+  namespace: argocd
+  labels:
+    app: products-api
+    environment: dev
+    component: application
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/company/products-api-gitops.git
+    targetRevision: main
+    path: helm-charts/products-api
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+      parameters:
+        - name: image.tag
+          value: "latest"
+        - name: replicaCount
+          value: "1"
+        - name: config.environment
+          value: "Development"
+      values: |
+        postgresql:
+          enabled: true
+          auth:
+            postgresPassword: "dev-password-123"
+        
+        monitoring:
+          enabled: true
+        
+        istio:
+          enabled: true
+          gateway:
+            hosts:
+              - products-api-dev.local
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: products-api-dev
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  revisionHistoryLimit: 10
+  
+  # Health check configuration
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/clusterIP
+  
+  # Notification configuration
+  info:
+    - name: 'Environment'
+      value: 'Development'
+    - name: 'Owner'
+      value: 'DevOps Team'
+    - name: 'Repository'
+      value: 'https://github.com/company/products-api-gitops'

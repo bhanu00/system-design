@@ -1,0 +1,141 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: products-api-gateway
+  namespace: products-api-dev
+  labels:
+    app: products-api
+    component: gateway
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - products-api-dev.local
+    - products-api.dev.company.com
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: products-api-dev-tls
+    hosts:
+    - products-api-dev.local
+    - products-api.dev.company.com
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: products-api-vs
+  namespace: products-api-dev
+  labels:
+    app: products-api
+    component: virtual-service
+spec:
+  hosts:
+  - products-api-dev.local
+  - products-api.dev.company.com
+  gateways:
+  - products-api-gateway
+  http:
+  # Health check routes (no authentication required)
+  - match:
+    - uri:
+        exact: /health
+    - uri:
+        exact: /ready
+    route:
+    - destination:
+        host: products-api
+        port:
+          number: 80
+    timeout: 5s
+  
+  # API routes with authentication and rate limiting
+  - match:
+    - uri:
+        prefix: /api/products
+    route:
+    - destination:
+        host: products-api
+        port:
+          number: 80
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 100ms
+  
+  # Swagger UI (development only)
+  - match:
+    - uri:
+        prefix: /swagger
+    route:
+    - destination:
+        host: products-api
+        port:
+          number: 80
+    timeout: 30s
+  
+  # Default route
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: products-api
+        port:
+          number: 80
+    timeout: 30s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: products-api-dr
+  namespace: products-api-dev
+  labels:
+    app: products-api
+    component: destination-rule
+spec:
+  host: products-api
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+        consecutiveGatewayErrors: 3
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+      splitExternalLocalOriginErrors: true
+  portLevelSettings:
+  - port:
+      number: 80
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        maxRequestsPerConnection: 5

@@ -1,0 +1,196 @@
+name: Products API CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore ProductsAPI/ProductsAPI.csproj
+    
+    - name: Build application
+      run: dotnet build ProductsAPI/ProductsAPI.csproj --no-restore --configuration Release
+    
+    - name: Run unit tests
+      run: dotnet test ProductsAPI/ProductsAPI.csproj --no-build --configuration Release --verbosity normal
+    
+    - name: Run security scan
+      uses: securecodewarrior/github-action-add-sarif@v1
+      with:
+        sarif-file: 'security-scan-results.sarif'
+      continue-on-error: true
+
+  build-and-push:
+    name: Build and Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value={{date 'YYYYMMDD-HHmmss'}}
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: ./ProductsAPI
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  update-gitops:
+    name: Update GitOps Repository
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout GitOps repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository }}-gitops
+        token: ${{ secrets.GITOPS_TOKEN }}
+        path: gitops-repo
+    
+    - name: Update Helm chart values
+      run: |
+        cd gitops-repo
+        
+        # Extract the SHA-based tag
+        IMAGE_TAG=$(echo "${{ needs.build-and-push.outputs.image-tag }}" | grep "main-" | head -1 | cut -d':' -f2)
+        
+        # Update the image tag in values.yaml
+        sed -i "s|tag: .*|tag: \"${IMAGE_TAG}\"|" helm-charts/products-api/values.yaml
+        
+        # Update Chart.yaml version
+        CHART_VERSION=$(date +%Y%m%d.%H%M%S)
+        sed -i "s|version: .*|version: ${CHART_VERSION}|" helm-charts/products-api/Chart.yaml
+        
+        # Commit and push changes
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add .
+        git commit -m "chore: update products-api image to ${IMAGE_TAG}"
+        git push
+
+  deploy-dev:
+    name: Deploy to Development
+    needs: [build-and-push, update-gitops]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: development
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+    
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region us-west-2 --name products-api-dev-cluster
+    
+    - name: Wait for ArgoCD sync
+      run: |
+        # Wait for ArgoCD to sync the changes
+        kubectl wait --for=condition=Synced application/products-api-dev -n argocd --timeout=300s
+        kubectl wait --for=condition=Healthy application/products-api-dev -n argocd --timeout=300s
+    
+    - name: Verify deployment
+      run: |
+        # Check if pods are running
+        kubectl get pods -n products-api-dev -l app=products-api
+        
+        # Check service health
+        kubectl get svc -n products-api-dev
+        
+        # Run smoke tests
+        kubectl run smoke-test --image=curlimages/curl --rm -i --restart=Never -- \
+          curl -f http://products-api.products-api-dev.svc.cluster.local/health
+
+  notify:
+    name: Notify Teams
+    needs: [deploy-dev]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify Slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()

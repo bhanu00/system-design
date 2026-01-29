@@ -1,0 +1,134 @@
+# Development environment values for Products API
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/company/products-api
+  pullPolicy: Always
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  sidecar.istio.io/inject: "true"
+
+podSecurityContext:
+  fsGroup: 1001
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application specific configuration
+config:
+  environment: "Development"
+  database:
+    connectionString: ""
+  logging:
+    level: "Debug"
+  features:
+    enableSwagger: true
+    enableDetailedErrors: true
+
+# Health check configuration
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessCheck:
+  enabled: true
+  path: /ready
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# PostgreSQL dependency for development
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "dev-password-123"
+    database: "productsdb"
+    username: "postgres"
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: "gp2"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Development-specific settings
+development:
+  debug: true
+  hotReload: false
+  mockExternalServices: true
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+  
+# Istio configuration
+istio:
+  enabled: true
+  gateway:
+    enabled: true
+    hosts:
+      - products-api-dev.local
+  virtualService:
+    enabled: true
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
